@@ -1,0 +1,143 @@
+import streamlit as st
+
+from ui import (
+    wrap_doc_in_html,
+    is_file_valid,
+    is_open_ai_key_valid,
+    display_file_read_error,
+)
+
+from core.caching import bootstrap_caching
+from core.parsing import read_file
+from core.chunking import chunk_file
+from core.embedding import embed_files
+from core.qa import query_folder
+from core.utils import get_llm
+
+EMBEDDING = "openai"
+VECTOR_STORE = "faiss"
+MODEL_LIST = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+
+LOGO_URL = 'https://assets-global.website-files.com/5e21dc6f4c5acf29c35bb32c/5e21e66410e34945f7f25add_Keboola_logo.svg'
+
+st.markdown(
+    f'''
+    <div style="text-align: right;">
+        <img src="{LOGO_URL}" alt="Logo" width="150">
+    </div>
+    ''',
+    unsafe_allow_html=True
+)
+
+st.header("Ask my PDF 🤖")
+
+# Enable caching for expensive functions
+bootstrap_caching()
+
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+
+if not openai_api_key:
+    st.warning(
+        "Enter your OpenAI API key in the secrets as OPENAI_API_KEY. You can get your key at"
+        " https://platform.openai.com/account/api-keys."
+    )
+
+with st.sidebar:
+    uploaded_files = st.file_uploader(
+        "Upload a pdf, docx, or txt file",
+        type=["pdf", "docx", "txt"],
+        help="Scanned documents are not supported yet!",
+        accept_multiple_files=True
+)
+
+    model: str = st.selectbox("Model", options=MODEL_LIST)  # type: ignore
+
+    with st.expander("Advanced Options"):
+        return_all_chunks = st.checkbox("Show all chunks retrieved from vector search")
+        show_full_doc = st.checkbox("Show parsed contents of the document")
+
+if not uploaded_files:
+    st.info("Upload a file to get started.")
+    st.stop()
+
+files = []
+for uploaded_file in uploaded_files:
+    try:
+        file = read_file(uploaded_file)
+        files.append(file)
+    except Exception as e:
+        display_file_read_error(e, file_name=uploaded_file.name)
+
+chunked_files = [chunk_file(file, chunk_size=300, chunk_overlap=0) for file in files]
+
+if not is_file_valid(file):
+    st.stop()
+
+if not is_open_ai_key_valid(openai_api_key, model):
+    st.stop()
+
+#with st.spinner("Indexing document... This may take a while ⏳"):
+folder_index = embed_files(
+        files=chunked_files,
+        embedding=EMBEDDING if model != "debug" else "debug",
+        vector_store=VECTOR_STORE if model != "debug" else "debug",
+        openai_api_key=openai_api_key,
+    )
+
+if show_full_doc:
+    with st.sidebar:
+        with st.expander("Document"):
+            for file in files:
+                st.markdown(f"<p>{wrap_doc_in_html(file.docs)}</p>", unsafe_allow_html=True)
+
+INITIAL_MESSAGE = [
+    {
+        "role": "assistant",
+        "content": "Hey there, what can I help you with?",
+    },
+]
+
+# Add a reset button
+if st.sidebar.button("Reset Chat"):
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.session_state["messages"] = INITIAL_MESSAGE
+    st.session_state["history"] = []
+
+if "messages" not in st.session_state.keys():
+    st.session_state["messages"] = INITIAL_MESSAGE
+
+for message in st.session_state['messages']:
+    if message["role"] == "user":
+        st.chat_message("user").write(message["content"])
+    else:
+        st.chat_message("assistant").write(message["content"])
+
+if query := st.chat_input("Ask a question about the document"):
+    st.session_state['messages'].append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.write(query)
+
+    with st.spinner("🤖 Thinking..."):
+        llm = get_llm(model=model, openai_api_key=openai_api_key, temperature=0)
+        result = query_folder(
+            folder_index=folder_index,
+            query=query,
+            return_all=return_all_chunks,
+            llm=llm,
+        )
+
+    st.session_state['messages'].append({"role": "assistant", "content": result.answer})
+    with st.chat_message("assistant"):
+        st.write(result.answer)
+    
+    with st.sidebar:
+        with st.expander("Sources"):
+            for source in result.sources:
+                try:
+                    clean_content = source.page_content.encode('utf-8', 'ignore').decode('utf-8')
+                    st.markdown(clean_content)
+                    st.markdown(source.metadata["source"])
+                except UnicodeEncodeError as e:
+                    st.error(f"Error encoding source content: {e}")
+                st.markdown("---")
