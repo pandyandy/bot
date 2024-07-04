@@ -46,7 +46,7 @@ class FolderIndex:
 
 
 def embed_files(
-    files: List[File], embedding: str, vector_store: str, **kwargs
+    files: List[File], embedding: str, vector_store: str, model: str = "text-embedding-3-small", **kwargs
 ) -> FolderIndex:
     """Embeds a collection of files and stores them in a FolderIndex."""
 
@@ -60,7 +60,10 @@ def embed_files(
     }
 
     if embedding in supported_embeddings:
-        _embeddings = supported_embeddings[embedding](**kwargs)
+        if embedding == "openai":
+            _embeddings = supported_embeddings[embedding](model=model, **kwargs)
+        else:
+            _embeddings = supported_embeddings[embedding](**kwargs)
     else:
         raise NotImplementedError(f"Embedding {embedding} not supported.")
 
