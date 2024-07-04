@@ -94,12 +94,12 @@ if show_full_doc:
 INITIAL_MESSAGE = [
     {
         "role": "assistant",
-        "content": "Hey there, what can I help you with?",
+        "content": "Hello! I'm here to assist with any questions you have about the uploaded documents. How can I help you today?",
     },
 ]
 
 # Add a reset button
-if st.sidebar.button("Reset Chat"):
+if st.sidebar.button("Reset Chat", use_container_width=True):
     for key in st.session_state.keys():
         del st.session_state[key]
     st.session_state["messages"] = INITIAL_MESSAGE
@@ -119,7 +119,7 @@ if query := st.chat_input("Ask a question about the document"):
     with st.chat_message("user", avatar='🧑‍💻'):
         st.write(query)
 
-    with st.spinner("🤖 Thinking..."):
+    with st.spinner("Processing your request, please wait..."):
         llm = get_llm(model=model, openai_api_key=openai_api_key, temperature=0.2)
         result = query_folder(
             folder_index=folder_index,
@@ -127,7 +127,7 @@ if query := st.chat_input("Ask a question about the document"):
             return_all=return_all_chunks,
             llm=llm,
         )
-
+    #st.write(result)
     pages = sorted(set(int(source.metadata["page"]) for source in result.sources))
     sources = ", ".join(map(str, pages))
     if sources:
@@ -137,8 +137,8 @@ if query := st.chat_input("Ask a question about the document"):
         <span style="color:grey; font-size: small; font-style: italic;">The information was found on the following pages: {sources}.</span>
         """
     else:
-        answer = result.answer
-    
+        answer = result.answer.split("SOURCES:")[0].strip()
+
     st.session_state['messages'].append({"role": "assistant", "content": answer})
     with st.chat_message("assistant", avatar=MINI_LOGO_URL):
         st.write(answer, unsafe_allow_html=True)
