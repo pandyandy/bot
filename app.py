@@ -18,18 +18,19 @@ EMBEDDING = "openai"
 VECTOR_STORE = "faiss"
 MODEL_LIST = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
 
-LOGO_URL = 'https://assets-global.website-files.com/5e21dc6f4c5acf29c35bb32c/5e21e66410e34945f7f25add_Keboola_logo.svg'
+MAIN_LOGO_URL = 'https://assets-global.website-files.com/5e21dc6f4c5acf29c35bb32c/5e21e66410e34945f7f25add_Keboola_logo.svg'
+MINI_LOGO_URL = 'https://components.keboola.com/images/default-app-icon.png'
 
 st.markdown(
     f'''
     <div style="text-align: right;">
-        <img src="{LOGO_URL}" alt="Logo" width="150">
+        <img src="{MAIN_LOGO_URL}" alt="Logo" width="150">
     </div>
     ''',
     unsafe_allow_html=True
 )
 
-st.header("Ask my PDF 🤖")
+st.header("AskMyPDF")
 
 # Enable caching for expensive functions
 bootstrap_caching()
@@ -109,17 +110,17 @@ if "messages" not in st.session_state.keys():
 
 for message in st.session_state['messages']:
     if message["role"] == "user":
-        st.chat_message("user").write(message["content"])
+        st.chat_message("user", avatar='🧑‍💻').write(message["content"])
     else:
-        st.chat_message("assistant").write(message["content"])
+        st.chat_message("assistant", avatar=MINI_LOGO_URL).write(message["content"], unsafe_allow_html=True)
 
 if query := st.chat_input("Ask a question about the document"):
     st.session_state['messages'].append({"role": "user", "content": query})
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar='🧑‍💻'):
         st.write(query)
 
     with st.spinner("🤖 Thinking..."):
-        llm = get_llm(model=model, openai_api_key=openai_api_key, temperature=0)
+        llm = get_llm(model=model, openai_api_key=openai_api_key, temperature=0.2)
         result = query_folder(
             folder_index=folder_index,
             query=query,
@@ -127,9 +128,21 @@ if query := st.chat_input("Ask a question about the document"):
             llm=llm,
         )
 
-    st.session_state['messages'].append({"role": "assistant", "content": result.answer})
-    with st.chat_message("assistant"):
-        st.write(result.answer)
+    pages = sorted(set(int(source.metadata["page"]) for source in result.sources))
+    sources = ", ".join(map(str, pages))
+    if sources:
+        answer = f"""
+        {result.answer}
+        
+        <span style="color:grey; font-size: small; font-style: italic;">The information was found on the following pages: {sources}.</span>
+        """
+    else:
+        answer = result.answer
+    
+    st.session_state['messages'].append({"role": "assistant", "content": answer})
+    with st.chat_message("assistant", avatar=MINI_LOGO_URL):
+        st.write(answer, unsafe_allow_html=True)
+
     
     with st.sidebar:
         with st.expander("Sources"):
