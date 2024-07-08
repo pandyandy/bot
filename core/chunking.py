@@ -4,7 +4,7 @@ from core.parsing import File
 
 
 def chunk_file(
-    file: File, chunk_size: int, chunk_overlap: int = 0, model_name="gpt-3.5-turbo"
+    file: File, chunk_size: int, chunk_overlap: int = 0, model_name="gpt-4o"
 ) -> File:
     """Chunks each document in a file into smaller documents
     according to the specified chunk size and overlap
