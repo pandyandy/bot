@@ -114,6 +114,12 @@ for message in st.session_state['messages']:
     else:
         st.chat_message("assistant", avatar=MINI_LOGO_URL).write(message["content"], unsafe_allow_html=True)
 
+def extract_answer_without_sources(result_answer: str) -> str:
+    normalized_answer = result_answer.replace("\nSOURCES:", " SOURCES:")
+    normalized_answer = normalized_answer.replace("SOURCES:\n", "SOURCES: ")
+    answer = normalized_answer.split("SOURCES:")[0].strip()
+    return answer
+
 if query := st.chat_input("Ask a question about the document"):
     st.session_state['messages'].append({"role": "user", "content": query})
     with st.chat_message("user", avatar='🧑‍💻'):
@@ -137,8 +143,8 @@ if query := st.chat_input("Ask a question about the document"):
         <span style="color:grey; font-size: small; font-style: italic;">The information was found on the following pages: {sources}.</span>
         """
     else:
-        answer = result.answer.split("SOURCES:")[0].strip()
-
+        answer = extract_answer_without_sources(result.answer)
+        
     st.session_state['messages'].append({"role": "assistant", "content": answer})
     with st.chat_message("assistant", avatar=MINI_LOGO_URL):
         st.write(answer, unsafe_allow_html=True)
