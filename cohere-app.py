@@ -28,9 +28,13 @@ session_id = st.session_state.id
 client = None
 
 def reset_chat():
-    st.session_state.messages = []
-    st.session_state.context = None
-    gc.collect()
+   # st.session_state.messages = []
+    #st.session_state.context = None
+    #gc.collect()
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.session_state["messages"] = INITIAL_MESSAGE
+    st.session_state["history"] = []
 
 
 def display_pdf(file):
@@ -52,7 +56,7 @@ def display_pdf(file):
 with st.sidebar:
     API_KEY = st.secrets["cohere_api_key"]
 
-    uploaded_file = st.file_uploader("Choose your `.pdf` file", type="pdf")
+    uploaded_file = st.file_uploader("Upload your PDF file:", type="pdf")
 
     if uploaded_file and API_KEY:
         try:
@@ -63,7 +67,7 @@ with st.sidebar:
                     f.write(uploaded_file.getvalue())
                 
                 file_key = f"{session_id}-{uploaded_file.name}"
-                st.write("Indexing your document...")
+                st.text("⏳ Indexing your document.")
 
                 if file_key not in st.session_state.get('file_cache', {}):
 
@@ -122,7 +126,7 @@ with st.sidebar:
                     query_engine = st.session_state.file_cache[file_key]
 
                 # Inform the user that the file is processed and Display the PDF uploaded
-                st.success("Ready to Chat!")
+                st.text("🤓 Ready to chat.")
                 display_pdf(uploaded_file)
         except Exception as e:
             st.error(f"An error occurred: {e}")
@@ -136,9 +140,16 @@ with col1:
 with col2:
     st.button("Clear ↺", on_click=reset_chat)
 
+INITIAL_MESSAGE = [
+    {
+        "role": "assistant",
+        "content": "Hello! I'm here to assist with any questions you have about the uploaded documents. How can I help you today?",
+    },
+]
+
 # Initialize chat history
-if "messages" not in st.session_state:
-    reset_chat()
+if "messages" not in st.session_state.keys():
+    st.session_state["messages"] = INITIAL_MESSAGE
 
 
 # Display chat messages from history on app rerun
@@ -149,7 +160,7 @@ for message in st.session_state['messages']:
         st.chat_message("assistant", avatar=MINI_LOGO_URL).markdown(message["content"], unsafe_allow_html=True)
 
 # Accept user input
-if prompt := st.chat_input("What's up?"):
+if prompt := st.chat_input("Ask a question"):
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
     # Display user message in chat message container
