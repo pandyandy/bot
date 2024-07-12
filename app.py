@@ -40,12 +40,12 @@ openai_api_key = st.secrets["OPENAI_API_KEY"]
 if not openai_api_key:
     st.warning(
         "Enter your OpenAI API key in the secrets as OPENAI_API_KEY. You can get your key at"
-        " https://platform.openai.com/account/api-keys."
+        " https://platform.openai.com/api-keys."
     )
 
 with st.sidebar:
     uploaded_files = st.file_uploader(
-        "Upload a pdf, docx, or txt file",
+        "Upload a PDF, DOCX, or TXT file.",
         type=["pdf", "docx", "txt"],
         help="Scanned documents are not supported yet!",
         accept_multiple_files=True

@@ -49,7 +49,6 @@ def is_open_ai_key_valid(openai_api_key, model: str) -> bool:
         return True
 
     if not openai_api_key:
-        st.error("Please enter your OpenAI API key in the sidebar!")
         return False
     try:
         openai.ChatCompletion.create(
